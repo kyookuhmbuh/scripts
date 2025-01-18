@@ -1,0 +1,8 @@
+
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
+*.dll
+
+.clang-tidy-database
