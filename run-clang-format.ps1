@@ -1,22 +1,40 @@
 
+[CmdletBinding(PositionalBinding=$false)]
 param (
- $Path   
+  [Parameter(ValueFromPipeline=$True, ValueFromPipelineByPropertyName=$True)]
+  $Path = ".",
+
+  [Parameter()]
+  $Filter = ("*.cpp","*.hpp","*.c","*.h"),
+
+  [Parameter(ValueFromRemainingArguments=$true)]
+  $Arguments
 )
 
 $ClangToolItem = Get-Item -Path $Path
-$ClangToolWorkingDir = $PSScriptRoot # or Get-Location
+$ClangToolFilter=($Filter)
+$ClangToolWorkingDir = Get-Location
 $ClangToolWorkingDir = "$ClangToolWorkingDir"
-
-$ClangToolArgs = ($MyInvocation.UnboundArguments)
+$ClangToolArgs = ($Arguments)
 
 echo "-- ClangToolItem=$ClangToolItem" 
+echo "-- ClangToolFilter=$ClangToolFilter" 
 echo "-- ClangToolArgs=$ClangToolArgs" 
 echo "-- ClangToolWorkingDir=$ClangToolWorkingDir" 
-echo "-- ClangToolDataBasePath=$ClangToolDataBasePath" 
 
-# Visual Studio Developer Environment
-. $env:VS140COMNTOOLS\'Launch-VsDevShell.ps1'
-cd $ClangToolWorkingDir
+# Run Visual Studio Developer Environment
+function Run-VsDevShell() 
+{
+    $CurrentWorkingDir = Get-Location
+    $VsInstallerPath = join-path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer';
+    $VsWhere = join-path $VsInstallerPath vswhere.exe
+    cd $VsInstallerPath
+    $VsToolsPath = . $VsWhere -prerelease -latest -property installationPath
+    . $VsToolsPath\'Common7\Tools\Launch-VsDevShell.ps1'
+    cd $CurrentWorkingDir
+}
+
+Run-VsDevShell;
 
 if([System.IO.File]::Exists($ClangToolItem)) 
 {
@@ -25,9 +43,13 @@ if([System.IO.File]::Exists($ClangToolItem))
 else 
 {
     $ClangToolProcessFiles = `
-        Get-ChildItem -Path $ClangToolItem.FullName -File -Recurse -Include "*.cpp","*.hpp","*.c","*.h" `
+        Get-ChildItem -Path $ClangToolItem.FullName -File -Recurse -Include $ClangToolFilter `
         | %{ $_.FullName } ;
 }
 
 echo "-- ClangToolCommand=clang-format $ClangToolArgs <Files...($(($ClangToolProcessFiles).Count))>" 
-clang-format $ClangToolArgs $ClangToolProcessFiles
+
+if ($($ClangToolProcessFiles).Count -ne 0) 
+{
+    clang-format $ClangToolArgs $ClangToolProcessFiles
+}
